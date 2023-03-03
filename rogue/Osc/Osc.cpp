@@ -12,6 +12,7 @@ Oscillator osc1;
 Oscillator osc2;
 int hdResult;
 bool ledState = false;
+bool debugState = false;
 
 void SeedAudioCallback(AudioHandle::InterleavingInputBuffer  in,
                        AudioHandle::InterleavingOutputBuffer out,
@@ -37,7 +38,8 @@ void RogueAudioCallback(AudioHandle::TdmInputBuffer in,
                         size_t size)
 {
     float osc_out;
-    ledState = !ledState;
+
+    debugState = !debugState;
     hardware.SetDebugOut(ledState);
 
     //Fill the block with samples
@@ -53,12 +55,18 @@ void RogueAudioCallback(AudioHandle::TdmInputBuffer in,
     }  
 }
 
+void HandleMidiMessage(MidiEvent m) {
+
+}
 
 int main(void)
 {
+
+    uint32_t tickFreq;
+    uint32_t currTime;
+    uint32_t lastTime;
+
     // Configure and Initialize the Daisy Seed
-    // These are separate to allow reconfiguration of any of the internal
-    // components before initialization.
     hdResult = hardware.Init();
     if (hdResult == 0)
         hardware.SetSeedLed(true);
@@ -79,15 +87,33 @@ int main(void)
     osc2.SetAmp(1.f);
     osc2.SetFreq(440);
 
-    //Start calling the audio callbacks
+    //Start the audio callbacks
     hardware.StartSeedAudio(SeedAudioCallback);
     hdResult = hardware.StartRogueAudio(RogueAudioCallback);
     if (hdResult != 0)
         hardware.SetSeedLed(false);
 
+    hardware.midi.StartReceive();
+
+    tickFreq = hardware.system.GetTickFreq() / 1000;
+    lastTime = hardware.system.GetTick() / tickFreq;
+
     // Loop forever
     for(;;) {
         // Wait 500ms
-        System::Delay(500);
+        //System::Delay(500);
+
+        hardware.midi.Listen();
+        while (hardware.midi.HasEvents()) {
+            HandleMidiMessage(hardware.midi.PopEvent());
+        }
+
+        currTime = hardware.system.GetTick() / tickFreq;
+
+        if ((currTime - lastTime) > 1000) {
+            lastTime = currTime;
+            ledState = !ledState;
+            hardware.SetSeedLed(ledState);
+        }
     }
 }
