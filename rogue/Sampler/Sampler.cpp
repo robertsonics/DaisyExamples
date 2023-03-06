@@ -10,8 +10,9 @@ using namespace daisysp;
 DaisyRogue  hardware;
 Oscillator osc1;
 Oscillator osc2;
-DaisyRogue::Result  hdResult;
+int hdResult;
 bool ledState = false;
+bool debugState = false;
 
 void SeedAudioCallback(AudioHandle::InterleavingInputBuffer  in,
                        AudioHandle::InterleavingOutputBuffer out,
@@ -37,6 +38,9 @@ void RogueAudioCallback(AudioHandle::TdmInputBuffer in,
                         size_t size)
 {
     float osc_out;
+
+    debugState = !debugState;
+    hardware.SetDebugOut(ledState);
 
     //Fill the block with samples
     int n = 0;
@@ -64,12 +68,12 @@ int main(void)
 
     // Configure and Initialize the Daisy Seed
     hdResult = hardware.Init();
-    if (hdResult == DaisyRogue::Result::OK)
+    if (hdResult == 0)
         hardware.SetSeedLed(true);
-    hardware.seed.SetAudioBlockSize(64);
+    hardware.SetSeedAudioBlockSize(128);
 
     //How many samples we'll output per second
-    float samplerate = hardware.seed.AudioSampleRate();
+    float samplerate = hardware.SeedAudioSampleRate();
 
     //Set up oscillator 1
     osc1.Init(samplerate);
@@ -84,10 +88,9 @@ int main(void)
     osc2.SetFreq(440);
 
     //Start the audio callbacks
-    //hardware.StartSeedAudio(SeedAudioCallback);
-    hardware.seed.StartAudio(SeedAudioCallback);
+    hardware.StartSeedAudio(SeedAudioCallback);
     hdResult = hardware.StartRogueAudio(RogueAudioCallback);
-    if (hdResult != DaisyRogue::Result::OK)
+    if (hdResult != 0)
         hardware.SetSeedLed(false);
 
     hardware.midi.StartReceive();
