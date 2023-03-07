@@ -1,12 +1,16 @@
 # Project Name
-TARGET = Sampler
+TARGET = SamplePlayer
 
 # Sources
-CPP_SOURCES = Sampler.cpp
+CPP_SOURCES = SamplePlayer.cpp
+CPP_SOURCES += Sample.cpp
 
 # Library Locations
 LIBDAISY_DIR = ../../libDaisy
 DAISYSP_DIR = ../../DaisySP
+
+# Includes FatFS source files within project.
+USE_FATFS = 1
 
 # Core location, and generic makefile.
 SYSTEM_FILES_DIR = $(LIBDAISY_DIR)/core

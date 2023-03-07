@@ -6,8 +6,9 @@
 using namespace daisy;
 using namespace daisysp;
 
-// Declare a DaisyRogue object called hardware
-DaisyRogue  hardware;
+// Declare a DaisyRogue object
+DaisyRogue  rogue;
+
 Oscillator osc1;
 Oscillator osc2;
 DaisyRogue::Result  hdResult;
@@ -51,10 +52,6 @@ void RogueAudioCallback(AudioHandle::TdmInputBuffer in,
     }  
 }
 
-void HandleMidiMessage(MidiEvent m) {
-
-}
-
 int main(void)
 {
 
@@ -63,13 +60,14 @@ int main(void)
     uint32_t lastTime;
 
     // Configure and Initialize the Daisy Seed
-    hdResult = hardware.Init();
-    if (hdResult == DaisyRogue::Result::OK)
-        hardware.SetSeedLed(true);
-    hardware.seed.SetAudioBlockSize(64);
+    rogue.Init();
+
+    // The rogue TDM buffers are currently hard-coded to 64 samples, so we'll
+    //  set the Seed's audio blocksize to that as well.
+    rogue.seed.SetAudioBlockSize(64);
 
     //How many samples we'll output per second
-    float samplerate = hardware.seed.AudioSampleRate();
+    float samplerate = rogue.seed.AudioSampleRate();
 
     //Set up oscillator 1
     osc1.Init(samplerate);
@@ -84,33 +82,21 @@ int main(void)
     osc2.SetFreq(440);
 
     //Start the audio callbacks
-    //hardware.StartSeedAudio(SeedAudioCallback);
-    hardware.seed.StartAudio(SeedAudioCallback);
-    hdResult = hardware.StartRogueAudio(RogueAudioCallback);
-    if (hdResult != DaisyRogue::Result::OK)
-        hardware.SetSeedLed(false);
+    rogue.seed.StartAudio(SeedAudioCallback);
+    rogue.StartRogueAudio(RogueAudioCallback);
 
-    hardware.midi.StartReceive();
-
-    tickFreq = hardware.system.GetTickFreq() / 1000;
-    lastTime = hardware.system.GetTick() / tickFreq;
+    tickFreq = rogue.system.GetTickFreq() / 1000;
+    lastTime = rogue.system.GetTick() / tickFreq;
 
     // Loop forever
     for(;;) {
-        // Wait 500ms
-        //System::Delay(500);
 
-        hardware.midi.Listen();
-        while (hardware.midi.HasEvents()) {
-            HandleMidiMessage(hardware.midi.PopEvent());
-        }
-
-        currTime = hardware.system.GetTick() / tickFreq;
-
+        //Blink the Seed's LED
+        currTime = rogue.system.GetTick() / tickFreq;
         if ((currTime - lastTime) > 1000) {
             lastTime = currTime;
             ledState = !ledState;
-            hardware.SetSeedLed(ledState);
+            rogue.SetSeedLed(ledState);
         }
     }
 }
