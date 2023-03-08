@@ -14,7 +14,7 @@ using namespace daisysp;
 
 // Declare a DaisyRogue object called rogue
 DaisyRogue rogue;
-DaisyRogue::Result hdResult;
+//DaisyRogue::Result hdResult;
 
 bool ledState = false;
 
@@ -24,6 +24,9 @@ FatFSInterface fsi;
 // Create a sample object for each of our output channels
 Sample sample[NUM_CHANNELS];
 
+WAV_FormatTypeDef wavHeader;
+FIL fil;
+
 // Allocate an SDRAM buffer for each sample
 float DSY_SDRAM_BSS sampleBuff[NUM_CHANNELS];
 
@@ -31,7 +34,6 @@ void SeedAudioCallback(AudioHandle::InterleavingInputBuffer  in,
                        AudioHandle::InterleavingOutputBuffer out,
                        size_t                                size)
 {
- 
     //Fill the block with samples
     for(size_t i = 0; i < size; i += 2)
     {
@@ -57,7 +59,6 @@ void RogueAudioCallback(AudioHandle::TdmInputBuffer in,
 }
 
 void HandleMidiMessage(MidiEvent m) {
-
 }
 
 int main(void)
@@ -68,9 +69,8 @@ int main(void)
     uint32_t lastTime;
 
     // Configure and Initialize the Daisy Seed
-    hdResult = rogue.Init();
-    if (hdResult == DaisyRogue::Result::OK)
-        rogue.SetSeedLed(true);
+    rogue.Init();
+    rogue.SetSeedLed(false);
 
     //rogue.seed.StartLog(true);
     //System::Delay(4000);
@@ -90,21 +90,24 @@ int main(void)
     fsi.Init(FatFSInterface::Config::MEDIA_SD);
     FATFS& fs = fsi.GetSDFileSystem();
     char filename[32];
-    FIL fil;
-    WAV_FormatTypeDef wavHeader;
     unsigned int br;
 
     if (f_mount(&fs, "/", 1) == FR_OK) {
  
          // Now search the microSD card for appropriately named wav files
         //  and load our samples accordingly.
-        for (int s = 0; s < NUM_CHANNELS; s++) {
+        for (int s = 0; s < 1; s++) {
+
+            sprintf(filename, "sample%d.wav", s + 1);
+
             if (f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ) == FR_OK) {
 
                 // Read the wav header
-                f_read(&fil, &wavHeader, sizeof(wavHeader), &br);
+                FRESULT fr = f_read(&fil, &wavHeader, sizeof(wavHeader), &br);
 
-                if (wavHeader.NbrChannels == 1) {
+                if ((fr == FR_OK) && (wavHeader.NbrChannels == 1)) {
+
+                    rogue.SetSeedLed(true);
 
                 }
 
@@ -115,9 +118,7 @@ int main(void)
 
      //Start the audio callbacks
     rogue.seed.StartAudio(SeedAudioCallback);
-    hdResult = rogue.StartRogueAudio(RogueAudioCallback);
-    if (hdResult != DaisyRogue::Result::OK)
-        rogue.SetSeedLed(false);
+    rogue.StartRogueAudio(RogueAudioCallback);
 
     //Start MIDI input
     rogue.midi.StartReceive();
@@ -138,7 +139,7 @@ int main(void)
         if ((currTime - lastTime) > 1000) {
             lastTime = currTime;
             ledState = !ledState;
-            rogue.SetSeedLed(ledState);
+            //rogue.SetSeedLed(ledState);
             //rogue.seed.PrintLine("Blink");
         }
     }
