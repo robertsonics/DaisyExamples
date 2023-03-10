@@ -6,6 +6,7 @@
 
 #define NUM_CHANNELS    10
 #define MAX_BUFFER_SIZE 144000
+#define FIRST_MIDI_NOTE 48
 
 // Use the daisy namespace to prevent having to type
 // daisy:: before all libdaisy functions
@@ -49,40 +50,35 @@ void RogueAudioCallback(AudioHandle::TdmInputBuffer in,
                         int numChans,
                         size_t size)
 {
-    //Fill the block with samples
-    int n = 0;
-    for(size_t i = 0; i < size; i++)
-    {
-        for (int c = 0; c < numChans; c++) {
-            out[n++] = 0.0f;
-        }
-    }  
+    // This callback is for the first 8 output channels
+
+    memset(out, 0, (size * numChans * sizeof(float)));
+    for (int s = 0; s < 8; s++) {
+        if (sample[s].isPlaying())
+            sample[s].getSamples(&out[s * size], size);
+    }
 }
 
 void HandleMidiMessage(MidiEvent m) {
 
-   switch(m.type)
+    switch(m.type)
     {
-        case NoteOn:
-        {
+        case NoteOn: {
             NoteOnEvent p = m.AsNoteOn();
-            // Note Off can come in as Note On w/ 0 Velocity
-            if(p.velocity == 0.f)
-            {
-                //voice_handler.OnNoteOff(p.note, p.velocity);
-                sample[0].start();
-            }
-            else
-            {
-                sample[0].stop();
+            if ((p.note >= FIRST_MIDI_NOTE) && (p.note < FIRST_MIDI_NOTE + NUM_CHANNELS)) {
+                if(p.velocity > 0.f)
+                    sample[p.note - FIRST_MIDI_NOTE].start();
+                else
+                    sample[p.note - FIRST_MIDI_NOTE].start();
             }
         }
         break;
-        case NoteOff:
-        {
-            //NoteOnEvent p = m.AsNoteOn();
-            //voice_handler.OnNoteOff(p.note, p.velocity);
-            sample[0].stop();
+
+        case NoteOff: {
+            NoteOnEvent p = m.AsNoteOn();
+            if ((p.note >= FIRST_MIDI_NOTE) && (p.note < FIRST_MIDI_NOTE + NUM_CHANNELS)) {
+                sample[p.note - FIRST_MIDI_NOTE].stop();
+            }
         }
         break;
         default: break;
@@ -95,6 +91,7 @@ int main(void)
     uint32_t tickFreq;
     uint32_t currTime;
     uint32_t lastTime;
+    bool audioPlaying = false;
 
     // Configure and Initialize the Daisy Seed
     rogue.Init();
@@ -109,7 +106,7 @@ int main(void)
 
     // Initialize sample buffer pointers
     for (int s = 0; s < NUM_CHANNELS; s++)
-        sample[s].init((float *)&sampleBuff[s], MAX_BUFFER_SIZE);
+        sample[s].init((float *)&sampleBuff[s][0], MAX_BUFFER_SIZE);
 
     // Initialize the microSD and FAT File System, and mount the card
     SdmmcHandler::Config sd_config;
@@ -124,7 +121,7 @@ int main(void)
  
          // Now search the microSD card for appropriately named wav files
         //  and load our samples accordingly.
-        for (int s = 0; s < 2; s++) {
+        for (int s = 0; s < NUM_CHANNELS; s++) {
 
             sprintf(filename, "sample%d.wav", s + 1);
             if (f_open(&fil, filename, FA_OPEN_EXISTING | FA_READ) == FR_OK) {
@@ -145,6 +142,7 @@ int main(void)
                         break;
 
                         case 32:
+                            sample[s].setNumSamples(wavHeader.SubCHunk2Size / 4);
                             fr = f_read(&fil, &sampleBuff[s][0], wavHeader.SubCHunk2Size, &br);
                         break;
 
@@ -177,13 +175,19 @@ int main(void)
             HandleMidiMessage(rogue.midi.PopEvent());
         }
 
-        currTime = rogue.system.GetTick() / tickFreq;
+        audioPlaying  = false;
+        for (int c = 0; c < NUM_CHANNELS; c++) {
+            if (sample[c].isPlaying())
+                audioPlaying = true;
+        }
+        rogue.SetSeedLed(audioPlaying);
 
+        currTime = rogue.system.GetTick() / tickFreq;
         if ((currTime - lastTime) > 1000) {
             lastTime = currTime;
-            ledState = !ledState;
-            rogue.SetSeedLed(ledState);
-            rogue.seed.PrintLine("Blink");
+            //ledState = !ledState;
+            //rogue.SetSeedLed(ledState);
+            //rogue.seed.PrintLine("Blink");
         }
     }
 }

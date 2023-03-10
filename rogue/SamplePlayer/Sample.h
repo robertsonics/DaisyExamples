@@ -16,6 +16,7 @@ class Sample
     void stop(void)                     { playing = false; }
     void setLoopFlag(bool looping)      { loopFlag = looping; }
     bool getSamples(float * pDst, uint32_t n);
+    bool isPlaying(void)                { return playing; }
  
   private:
 
