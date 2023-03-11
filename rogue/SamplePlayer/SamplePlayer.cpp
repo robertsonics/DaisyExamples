@@ -39,28 +39,26 @@ int16_t DSY_SDRAM_BSS convertBuffer[MAX_BUFFER_SIZE];
 
 // ****************************************************************************
 // Audio callback routine for the Seed's stereo input/output
-void SeedAudioCallback(AudioHandle::InterleavingInputBuffer  in,
-                       AudioHandle::InterleavingOutputBuffer out,
-                       size_t                                size)
+void SeedAudioCallback(AudioHandle::InputBuffer  in,
+                       AudioHandle::OutputBuffer out,
+                       size_t                   size)
 {
-    //Fill the block with samples
-    for(size_t i = 0; i < size; i += 2)
-    {
-        //Set the left and right outputs
-        out[i]     = 0.0f;
-        out[i + 1] = 0.0f;
-    }
+    //Prefill output buffer with silence
+    memset(&out[0][0], 0, size * 2 * sizeof(float));
+
+    // Fetch data if corresponding sample is playing
+    if (sample[8].isPlaying())
+        sample[8].getSamples(&out[0][0], size);
+    if (sample[9].isPlaying())
+        sample[9].getSamples(&out[1][0], size);
+
 }
 
 // ****************************************************************************
 // Audio callback routine for the Rogue's 8 output channels TDM. The TDM
 //  out buffer is not interleaved and is organized as:
 //
-//  float channel1[size]
-//  float channel2[size]
-//  float channel3[size]
-//  ...
-//  float channel(numChan - 1)[size]
+//  float out[channel][size]
 //
 // The Daisy Rogue provides TDM output only, so the input buffer is not used.
 
