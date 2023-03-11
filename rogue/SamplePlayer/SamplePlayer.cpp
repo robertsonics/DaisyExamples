@@ -4,8 +4,13 @@
 
 #define __DEBUG_MESSAGES__
 
+// Number of output channels = number of samples; 
 #define NUM_CHANNELS    10
-#define MAX_BUFFER_SIZE 144000
+
+// Max mono wav file size in samples = 8 secs
+#define MAX_BUFFER_SIZE 384000
+
+// First MIDI note number triggers first sample
 #define FIRST_MIDI_NOTE 48
 
 // Use the daisy namespace to prevent having to type
@@ -18,20 +23,22 @@ DaisyRogue rogue;
 
 bool ledState = false;
 
+// SD card stuff that needs to be global
 SdmmcHandler sdcard;
 FatFSInterface fsi;
+WAV_FormatTypeDef wavHeader;
+FIL fil;
 
 // Create a sample object for each of our output channels
 Sample sample[NUM_CHANNELS];
 
-WAV_FormatTypeDef wavHeader;
-FIL fil;
-
 // Allocate an SDRAM buffer for each sample, as well as a single
 //  buffer for when we need to load and convert 16-bit files.
 float DSY_SDRAM_BSS sampleBuff[NUM_CHANNELS][MAX_BUFFER_SIZE];
-int16_t convertBuffer[MAX_BUFFER_SIZE];
+int16_t DSY_SDRAM_BSS convertBuffer[MAX_BUFFER_SIZE];
 
+// ****************************************************************************
+// Audio callback routine for the Seed's stereo input/output
 void SeedAudioCallback(AudioHandle::InterleavingInputBuffer  in,
                        AudioHandle::InterleavingOutputBuffer out,
                        size_t                                size)
@@ -45,20 +52,35 @@ void SeedAudioCallback(AudioHandle::InterleavingInputBuffer  in,
     }
 }
 
+// ****************************************************************************
+// Audio callback routine for the Rogue's 8 output channels TDM. The TDM
+//  out buffer is not interleaved and is organized as:
+//
+//  float channel1[size]
+//  float channel2[size]
+//  float channel3[size]
+//  ...
+//  float channel(numChan - 1)[size]
+//
+// The Daisy Rogue provides TDM output only, so the input buffer is not used.
+
 void RogueAudioCallback(AudioHandle::TdmInputBuffer in,
                         AudioHandle::TdmOutputBuffer out,
                         int numChans,
                         size_t size)
 {
-    // This callback is for the first 8 output channels
-
+    // Prefill all channels with silence
     memset(out, 0, (size * numChans * sizeof(float)));
+
+    // Then fetch data for any samples that are currently playing
     for (int s = 0; s < 8; s++) {
         if (sample[s].isPlaying())
             sample[s].getSamples(&out[s * size], size);
     }
 }
 
+// ****************************************************************************
+// MIDI input event handler
 void HandleMidiMessage(MidiEvent m) {
 
     switch(m.type)
@@ -85,12 +107,14 @@ void HandleMidiMessage(MidiEvent m) {
     }
 }
 
-int main(void)
-{
+// ****************************************************************************
+// Main
+int main(void) {
 
     uint32_t tickFreq;
     uint32_t currTime;
     uint32_t lastTime;
+    uint32_t numSamples;
     bool audioPlaying = false;
 
     // Configure and Initialize the Daisy Seed
@@ -131,27 +155,33 @@ int main(void)
                 FRESULT fr = f_read(&fil, &wavHeader, sizeof(wavHeader), &br);
                 if ((fr == FR_OK) && (wavHeader.NbrChannels == 1)) {
 
+                    // Load the file according to the sample type. Make sure we don't
+                    //  load more than will fit in our buffers.
                     switch (wavHeader.BitPerSample) {
 
                         case 16:
-                            sample[s].setNumSamples(wavHeader.SubCHunk2Size / 2);
-                            fr = f_read(&fil, convertBuffer, wavHeader.SubCHunk2Size, &br);
-                            for (uint32_t i = 0; i < sample[s].getNumSamples(); i++) {
+                            numSamples = wavHeader.SubCHunk2Size / 2;
+                            if (numSamples > MAX_BUFFER_SIZE)
+                                numSamples = MAX_BUFFER_SIZE;                           
+                            sample[s].setNumSamples(numSamples);
+                            fr = f_read(&fil, convertBuffer, (numSamples * 2), &br);
+                            for (uint32_t i = 0; i < numSamples; i++) {
                                 sampleBuff[s][i] = s162f(convertBuffer[i]);
                             }
                         break;
 
                         case 32:
-                            sample[s].setNumSamples(wavHeader.SubCHunk2Size / 4);
-                            fr = f_read(&fil, &sampleBuff[s][0], wavHeader.SubCHunk2Size, &br);
+                            numSamples = wavHeader.SubCHunk2Size / 4;
+                            if (numSamples > MAX_BUFFER_SIZE)
+                                numSamples = MAX_BUFFER_SIZE;                           
+                            sample[s].setNumSamples(numSamples);
+                            fr = f_read(&fil, &sampleBuff[s][0], (numSamples * 4), &br);
                         break;
 
                         default:
                         break;
                     }
-
                 }
-
                 f_close(&fil);
             }
         }
@@ -164,17 +194,20 @@ int main(void)
     //Start MIDI input
     rogue.midi.StartReceive();
 
+    // Initialize some timing variables.
     tickFreq = rogue.system.GetTickFreq() / 1000;
     lastTime = rogue.system.GetTick() / tickFreq;
 
     // Loop forever
     for(;;) {
 
+        // Process any incoming MIDI events.
         rogue.midi.Listen();
         while (rogue.midi.HasEvents()) {
             HandleMidiMessage(rogue.midi.PopEvent());
         }
 
+        // Turn on the Seed's LED whenever there's any audio playing
         audioPlaying  = false;
         for (int c = 0; c < NUM_CHANNELS; c++) {
             if (sample[c].isPlaying())
@@ -182,6 +215,7 @@ int main(void)
         }
         rogue.SetSeedLed(audioPlaying);
 
+        // In case we want to do anything at a regular interval...
         currTime = rogue.system.GetTick() / tickFreq;
         if ((currTime - lastTime) > 1000) {
             lastTime = currTime;
