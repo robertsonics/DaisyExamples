@@ -1,8 +1,8 @@
 # Project Name
-TARGET = Osc
+TARGET = TriggerOsc
 
 # Sources
-CPP_SOURCES = Osc.cpp
+CPP_SOURCES = TriggerOsc.cpp
 
 # Library Locations
 LIBDAISY_DIR = ../../libDaisy

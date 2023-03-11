@@ -1,6 +1,8 @@
 #include "daisy_rogue.h"
 #include "daisysp.h"
 
+#define TRIGGER_SCAN_MS      20
+
 // Use the daisy namespace to prevent having to type
 // daisy:: before all libdaisy functions
 using namespace daisy;
@@ -9,9 +11,7 @@ using namespace daisysp;
 // Declare a DaisyRogue object
 DaisyRogue  rogue;
 
-Oscillator osc1;
-Oscillator osc2;
-DaisyRogue::Result  hdResult;
+Oscillator osc;
 bool ledState = false;
 
 void SeedAudioCallback(AudioHandle::InterleavingInputBuffer  in,
@@ -24,7 +24,7 @@ void SeedAudioCallback(AudioHandle::InterleavingInputBuffer  in,
     for(size_t i = 0; i < size; i += 2)
     {
        //get the next oscillator sample
-        osc_out = osc1.Process();
+        osc_out = 0.0f;
 
         //Set the left and right outputs
         out[i]     = osc_out;
@@ -44,12 +44,16 @@ void RogueAudioCallback(AudioHandle::TdmInputBuffer in,
     for(size_t i = 0; i < size; i++)
     {
         //get the next oscillator sample
-        osc_out = osc2.Process();
+        osc_out = osc.Process();
 
         for (int c = 0; c < numChans; c++) {
             out[n++] = osc_out;
         }
     }  
+}
+
+void doTrigger(int trig) {
+
 }
 
 int main(void)
@@ -58,7 +62,7 @@ int main(void)
     uint32_t tickFreq;
     uint32_t currTime;
     uint32_t lastTime;
-
+   
     // Configure and Initialize the Daisy Seed
     rogue.Init();
 
@@ -69,17 +73,11 @@ int main(void)
     //How many samples we'll output per second
     float samplerate = rogue.seed.AudioSampleRate();
 
-    //Set up oscillator 1
-    osc1.Init(samplerate);
-    osc1.SetWaveform(osc1.WAVE_SIN);
-    osc1.SetAmp(1.f);
-    osc1.SetFreq(1000);
-
-    //Set up oscillator 2
-    osc2.Init(samplerate);
-    osc2.SetWaveform(osc2.WAVE_SIN);
-    osc2.SetAmp(1.f);
-    osc2.SetFreq(440);
+    //Set up our oscillator
+    osc.Init(samplerate);
+    osc.SetWaveform(osc.WAVE_SIN);
+    osc.SetAmp(1.f);
+    osc.SetFreq(1000);
 
     //Start the audio callbacks
     rogue.seed.StartAudio(SeedAudioCallback);
@@ -91,12 +89,23 @@ int main(void)
     // Loop forever
     for(;;) {
 
-        //Blink the Seed's LED
+        rogue.ProcessDigitalControls();
+        for (int t = 0; t < 8; t++) {
+            if (rogue.GetSwitch(t)->RisingEdge()) {
+                rogue.SetSeedLed(true);
+            }
+            if (rogue.GetSwitch(t)->FallingEdge()) {
+                rogue.SetSeedLed(false);
+            }
+         }
+
         currTime = rogue.system.GetTick() / tickFreq;
-        if ((currTime - lastTime) > 1000) {
+
+        //If time to do so, scan the input triggers
+        if ((currTime - lastTime) > TRIGGER_SCAN_MS) {
             lastTime = currTime;
-            ledState = !ledState;
-            rogue.SetSeedLed(ledState);
+
         }
     }
 }
+
