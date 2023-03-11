@@ -12,18 +12,16 @@ Electro-Smith toolchain and libDaisy to enable you to write your own firmware fo
 the Daisy Rogue board, as well as to offer a TDM implementation for the PCM1682
 multi-channel audio DAC for those wanting to design their own hardware.
 
-This is a work in progress. I am currently providing three example applications:
+This is a work in progress. I am currently providing two example applications:
 
-**Osc** - is the Electro-Smith simple oscillator example modified to output on
-all 10 output channels.
+**SamplePlayer** - is an example that loads ten .wav files from the microSD
+card, named "sampleX.wav" where X is 1 - 10, into SDRAM. MIDI Note events will
+play each sample out the corresponding output channel. This example demonstrates
+reading from the microSD card, MIDI input and routing audio via the TDM audio
+output buffer.
 
-**Midi** - is a very simple MIDI input test app that blinks the Seed LED
-
-**SamplePlayer** - is a more serious example that loads ten .wav files from
-the microSD card, named "sampleX.wav" where X is 1 - 10, into SDRAM. MIDI Note
-events will play each sample out the corresponding output channel. This example
-demonstrates reading from the microSD card, MIDI input and routing audio via
-the TDM audio output buffer.
+**TriggerOsc** - is an example that shows how to use the 8 trigger inputs to
+send send oscillator data to different outputs.
 
 A schematic for the Daisy Rogue PCB can be found at the bottom of this page:
 
