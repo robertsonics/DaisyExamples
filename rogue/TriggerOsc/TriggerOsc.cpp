@@ -1,7 +1,7 @@
 #include "daisy_rogue.h"
 #include "daisysp.h"
 
-#define TRIGGER_SCAN_MS      20
+#define LED_BLINK_MS      500
 
 // Use the daisy namespace to prevent having to type
 // daisy:: before all libdaisy functions
@@ -14,24 +14,17 @@ DaisyRogue  rogue;
 Oscillator osc;
 bool ledState = false;
 
-void SeedAudioCallback(AudioHandle::InterleavingInputBuffer  in,
-                       AudioHandle::InterleavingOutputBuffer out,
-                       size_t                                size)
+bool trigger[8];
+
+// ****************************************************************************
+void SeedAudioCallback(AudioHandle::InputBuffer  in,
+                       AudioHandle::OutputBuffer out,
+                       size_t                    size)
 {
-    float osc_out;
-
-    //Fill the block with samples
-    for(size_t i = 0; i < size; i += 2)
-    {
-       //get the next oscillator sample
-        osc_out = 0.0f;
-
-        //Set the left and right outputs
-        out[i]     = osc_out;
-        out[i + 1] = osc_out;
-    }
+    memset(&out[0][0], 0, size * 2 * sizeof(float));
 }
 
+// ****************************************************************************
 void RogueAudioCallback(AudioHandle::TdmInputBuffer in,
                         AudioHandle::TdmOutputBuffer out,
                         int numChans,
@@ -39,23 +32,27 @@ void RogueAudioCallback(AudioHandle::TdmInputBuffer in,
 {
     float osc_out;
 
-    //Fill the block with samples
-    int n = 0;
+    // Prefill all channels with silence
+    memset(out, 0, (size * numChans * sizeof(float)));
+
+    // For each trigger that is active, fill that output channel with data from
+    //  the oscillator.
+
     for(size_t i = 0; i < size; i++)
     {
         //get the next oscillator sample
         osc_out = osc.Process();
 
-        for (int c = 0; c < numChans; c++) {
-            out[n++] = osc_out;
-        }
+        // Check each trigger.
+        for (int t = 0; t < 8; t++) {
+            if (trigger[t]) {
+                out[i + (t * size)] = osc_out;
+            }
+        }  
     }  
 }
 
-void doTrigger(int trig) {
-
-}
-
+// ****************************************************************************
 int main(void)
 {
 
@@ -65,6 +62,9 @@ int main(void)
    
     // Configure and Initialize the Daisy Seed
     rogue.Init();
+
+    for (int i = 0; i < 8; i++)
+        trigger[i] = false;
 
     // The rogue TDM buffers are currently hard-coded to 64 samples, so we'll
     //  set the Seed's audio blocksize to that as well.
@@ -92,18 +92,21 @@ int main(void)
         rogue.ProcessDigitalControls();
         for (int t = 0; t < 8; t++) {
             if (rogue.GetSwitch(t)->RisingEdge()) {
-                rogue.SetSeedLed(true);
+                trigger[t] = true;
             }
             if (rogue.GetSwitch(t)->FallingEdge()) {
-                rogue.SetSeedLed(false);
+                trigger[t] = false;
             }
          }
 
         currTime = rogue.system.GetTick() / tickFreq;
 
-        //If time to do so, scan the input triggers
-        if ((currTime - lastTime) > TRIGGER_SCAN_MS) {
+        //If time to do so, toggle the heartbeat LED
+        if ((currTime - lastTime) > LED_BLINK_MS) {
             lastTime = currTime;
+
+            ledState = !ledState;
+            rogue.SetSeedLed(ledState);
 
         }
     }

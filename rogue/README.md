@@ -9,21 +9,45 @@ to the WAV Trigger and Tsunami but with increased MIDI capabilities.
 
 As service to the Daisy community, I'm providing a board support package for the
 Electro-Smith toolchain and libDaisy to enable you to write your own firmware for
-the Daisy Rogue board, as well as to offer a TDM implementation for the PCM1682
+the Daisy Rogue board, as well as providing a TDM implementation for the PCM1682
 multi-channel audio DAC for those wanting to design their own hardware.
 
-This is a work in progress. I am currently providing two example applications:
+This is a work in progress. There are currently two simple example applications:
 
-**SamplePlayer** - is an example that loads ten .wav files from the microSD
-card, named "sampleX.wav" where X is 1 - 10, into SDRAM. MIDI Note events will
-play each sample out the corresponding output channel. This example demonstrates
-reading from the microSD card, MIDI input and routing audio via the TDM audio
-output buffer.
+**SamplePlayer** - This example loads ten .wav files from the microSD card into
+SDRAM. A range of MIDI Note events will play each sample through the corresponding
+output channel. It demonstrates reading from the microSD card, MIDI input and
+routing audio to specific channes via the TDM audio output buffer.
 
-**TriggerOsc** - is an example that shows how to use the 8 trigger inputs to
-send send oscillator data to different outputs.
+Audio files should be named "sample1.wav" through "sample10.wav" and can be either
+16-bit fixed or 32-bit float, 48kHz, mono wav files. If the files are longer than
+8 seconds, the data will be truncated. The first MIDI note of the range is note
+number 48, but this can be easily changed.
+
+This app could be the basis for a 10-output drum module. Next steps would be to
+allow velocity to control volume and/or sample selection.
+
+**TriggerOsc** - This simple example shows how to use the 8 trigger inputs to
+send send oscillator data to different outputs. Each trigger will output an A440
+sine wave to the corresponding output. Multiple triggers can be activated at the
+same time.
 
 A schematic for the Daisy Rogue PCB can be found at the bottom of this page:
 
 [https://www.robertsonics.com/rogue-wav]
+
+**ToDo**
+
+The Daisy Rogue's TDM audio buffer is currently hardcoded with a block size of 64
+samples, which means approximately 1ms of latency. The SAI2 TDM implementation
+is currently in the board support source file and should be rolled into the sai
+module of libdaisy, at which time things like blocksize can be made adjustable.
+
+The Seed's stereo input/output channels (SAI1) are synchronized to the Rogue's 8
+TDM channels (SAI2) by virtue of the fact that they run off the same CPU clocks,
+but they are currently not started simultaneously. More work needs to be done to
+see if/how audio input from SAI1 can be cleanly sent to SAI2 output channels. An
+interesting application example would be a 10-channel panner, where for example,
+mono input from channel 1 could be dyncamically panned around 8 or 10 output
+channels under MIDI control.
 
