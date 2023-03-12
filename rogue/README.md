@@ -38,10 +38,11 @@ A schematic for the Daisy Rogue PCB can be found at the bottom of this page:
 
 **ToDo**
 
-The Daisy Rogue's TDM audio buffer is currently hardcoded with a block size of 64
-samples, which means approximately 1ms of latency. The SAI2 TDM implementation
-is currently in the board support source file and should be rolled into the sai
-module of libdaisy, at which time things like blocksize can be made adjustable.
+The Daisy Rogue's TDM audio buffer is currently hardcoded for a 48kHz sample rate
+with a block size of 64 samples, which means approximately 1ms of latency. The
+SAI2 TDM implementation is currently in the board support source file and should
+be rolled into the sai module of libdaisy, at which time things like sample rate
+and blocksize can be made adjustable.
 
 The Seed's stereo input/output channels (SAI1) are synchronized to the Rogue's 8
 TDM channels (SAI2) by virtue of the fact that they run off the same CPU clocks,
