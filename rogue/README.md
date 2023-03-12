@@ -9,7 +9,7 @@ to the WAV Trigger and Tsunami but with increased MIDI capabilities.
 
 As service to the Daisy community, I'm providing a board support package for the
 Electro-Smith toolchain and libDaisy to enable you to write your own firmware for
-the Daisy Rogue board, as well as providing a TDM implementation for the PCM1682
+the Daisy Rogue board, as well as providing a TDM implementation for the PCM1681
 multi-channel audio DAC for those wanting to design their own hardware.
 
 This is a work in progress. There are currently two simple example applications:
